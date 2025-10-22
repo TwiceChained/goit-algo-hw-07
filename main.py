@@ -121,18 +121,19 @@ def input_error(func):
     def inner(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except ValueError:
-            if func.__name__ in ("add_contact", "change_contact"):
-                return "Give me name and phone please."
-            if func.__name__ == "show_phone":
-                return "Enter user name."
-            return "Wrong arguments."
-
+        except ValueError as e:
+            return str(e)  # ← показуємо "Invalid date format..." або про телефон
         except KeyError:
             return "Contact not found."
         except IndexError:
-            return "Enter the argument for the command."
-        
+            # Точні підказки по нестачі аргументів
+            if func.__name__ == "add_contact":
+                return "Give me name and phone please."
+            if func.__name__ == "add_birthday":
+                return "Give me name and birthday (DD.MM.YYYY)."
+            if func.__name__ in ("show_birthday",):
+                return "Enter user name."
+            return "Not enough arguments."
     return inner
 
 
@@ -185,9 +186,6 @@ def birthdays(args, book):
     if not upcoming:
         return "No birthdays in the next 7 days."
     return "\n".join(f"{it['birthday']} — {it['name']}" for it in upcoming)
-
-
-
 
 
 

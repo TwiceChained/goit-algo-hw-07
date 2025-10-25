@@ -116,22 +116,20 @@ class AddressBook(UserDict):
 
 
 
-
 def input_error(func):
     def inner(*args, **kwargs):
         try:
             return func(*args, **kwargs)
         except ValueError as e:
-            return str(e)  # ← показуємо "Invalid date format..." або про телефон
-        except KeyError:
+            return str(e)
+        except (KeyError, AttributeError):
             return "Contact not found."
         except IndexError:
-            # Точні підказки по нестачі аргументів
             if func.__name__ == "add_contact":
                 return "Give me name and phone please."
             if func.__name__ == "add_birthday":
                 return "Give me name and birthday (DD.MM.YYYY)."
-            if func.__name__ in ("show_birthday",):
+            if func.__name__ in ("show_birthday", "show_phone"):
                 return "Enter user name."
             return "Not enough arguments."
     return inner
@@ -159,23 +157,50 @@ def add_contact(args, book: AddressBook):
 
 
 @input_error
+def change_contact(args, book: AddressBook):
+    name, old_p, new_p, *_ = args
+    rec = book.find(name)
+    rec.edit_phone(old_p, new_p)   # якщо контакта нема — зловимо AttributeError
+    return "Contact updated."
+
+
+@input_error
+def show_phone(args, book: AddressBook):
+    name, *_ = args
+    rec = book.find(name)
+    nums = ", ".join(p.value for p in rec.phones) or "No phones."
+    return nums
+
+
+@input_error
+def show_all(args, book: AddressBook):
+    if not book.data:
+        return "No contacts found."
+    lines = []
+    for rec in book.data.values():
+        phones = ", ".join(p.value for p in rec.phones) or "—"
+        bday = rec.birthday.value if rec.birthday else "—"
+        lines.append(f"{rec.name.value}: {phones}; birthday: {bday}")
+    return "\n".join(lines)
+
+
+@input_error
+def hello(args, book: AddressBook):
+    return "How can I help you?"
+
+
+@input_error
 def add_birthday(args, book):
     name, bday, *_ = args
     rec = book.find(name)
-    if rec is None:
-        rec = Record(name)
-        book.add_record(rec)
-    rec.add_birthday(bday)
+    rec.add_birthday(bday)  # якщо rec=None → AttributeError → "Contact not found."
     return "Birthday set."
-
 
 
 @input_error
 def show_birthday(args, book):
     name, *_ = args
-    rec = book.find(name)
-    if rec is None:    
-        raise KeyError
+    rec = book.find(name)                      # якщо None → AttributeError далі
     return rec.birthday.value if rec.birthday else "No birthday set."
 
 
@@ -195,7 +220,9 @@ if __name__ == '__main__':
     book = AddressBook()
     print("Welcome to the assistant bot!")
     while True:
-        user_input = input("Enter a command: ")
+        user_input = input("Enter a command: ").strip()
+        if not user_input:
+            continue
         command, *args = parse_input(user_input)
 
         if command in ["close", "exit"]:
@@ -203,38 +230,19 @@ if __name__ == '__main__':
             break
 
         elif command == "hello":
-            print("How can I help you?")
+            print(hello(args, book))
 
         elif command == "add":
             print(add_contact(args, book))
 
         elif command == "change":
-            name, old_p, new_p, *_ = args
-            rec = book.find(name)
-            if rec is None: print("Contact not found."); continue
-            try:
-                rec.edit_phone(old_p, new_p)
-                print("Contact updated.")
-            except ValueError as e:
-                print(str(e))
+            print(change_contact(args, book))
 
         elif command == "phone":
-            name, *_ = args
-            rec = book.find(name)
-            if rec is None: 
-                print("Contact not found.")
-            else:
-                nums = ", ".join(p.value for p in rec.phones) or "No phones."
-                print(nums)
+            print(show_phone(args, book))
 
         elif command == "all":
-            if not book.data:
-                print("No contacts found.")
-            else:
-                for rec in book.data.values():
-                    phones = ", ".join(p.value for p in rec.phones) or "—"
-                    bday = rec.birthday.value if rec.birthday else "—"
-                    print(f"{rec.name.value}: {phones}; birthday: {bday}")
+            print(show_all(args, book))
 
         elif command == "add-birthday":
             print(add_birthday(args, book))
